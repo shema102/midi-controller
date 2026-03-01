@@ -37,6 +37,10 @@ pico_sdk_init()
 
 add_executable(midi-controller src/main.cpp
         src/definitions.h
+        src/kb/keyboard.h
+        src/kb/events.cpp
+        src/kb/events.h
+        src/kb/keyboard.cpp
 )
 
 pico_set_program_name(midi-controller "midi-controller")
