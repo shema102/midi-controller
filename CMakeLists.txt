@@ -23,6 +23,7 @@ if (EXISTS ${picoVscode})
     include(${picoVscode})
 endif()
 # ====================================================================================
+
 set(PICO_BOARD pico2 CACHE STRING "Board type")
 
 # Pull in Raspberry Pi Pico SDK (must be before project)
@@ -33,26 +34,37 @@ project(midi-controller C CXX ASM)
 # Initialise the Raspberry Pi Pico SDK
 pico_sdk_init()
 
+# FreeRTOS
+set(FREERTOS_CONFIG_FILE_DIRECTORY ${CMAKE_CURRENT_LIST_DIR}/config)
+set(FREERTOS_KERNEL_PATH ${CMAKE_CURRENT_LIST_DIR}/lib/FreeRTOS-Kernel)
+
+include(${CMAKE_CURRENT_LIST_DIR}/FreeRTOS_Kernel_import.cmake)
+
 # Add executable. Default name is the project name, version 0.1
 
-add_executable(midi-controller src/main.cpp
-        src/definitions.h
-        src/kb/keyboard.h
-        src/kb/events.cpp
-        src/kb/events.h
-        src/kb/keyboard.cpp
+add_executable(midi-controller
+        src/main.cpp
+        config/definitions.h
+        config/FreeRTOSConfig.h
+        src/kb/handler/keyboard.h
+        src/kb/handler/keyboard.cpp
+        src/kb/event/events.h
+        src/kb/event/events.cpp
+        src/hooks.cpp
 )
 
 pico_set_program_name(midi-controller "midi-controller")
 pico_set_program_version(midi-controller "0.1")
 
 # Modify the below lines to enable/disable output over UART/USB
-pico_enable_stdio_uart(midi-controller 0)
-pico_enable_stdio_usb(midi-controller 1)
+pico_enable_stdio_uart(midi-controller 1)
+pico_enable_stdio_usb(midi-controller 0)
 
 # Add the standard library to the build
 target_link_libraries(midi-controller
-        pico_stdlib)
+        pico_stdlib
+        FreeRTOS-Kernel-Heap4
+)
 
 # Add the standard include files to the build
 target_include_directories(midi-controller PRIVATE

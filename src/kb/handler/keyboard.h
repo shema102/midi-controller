@@ -1,8 +1,8 @@
 #ifndef MIDI_CONTROLLER_KEYBOARD_H
 #define MIDI_CONTROLLER_KEYBOARD_H
-#include "events.h"
+#include "../event/events.h"
 #include "pico/types.h"
-#include "src/definitions.h"
+#include "../../../config/definitions.h"
 
 enum Col {
     CA,

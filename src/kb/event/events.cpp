@@ -1,6 +1,7 @@
+#include "events.h"
+
 #include <stdio.h>
 
-#include "events.h"
 
 void log_keyboard_event(const keyboard_event *event, size_t event_count) {
     for (size_t i = 0; i < event_count; ++i) {

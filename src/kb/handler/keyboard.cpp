@@ -1,9 +1,10 @@
 #include "keyboard.h"
 
-#include "events.h"
+#include "../event/events.h"
 #include "hardware/gpio.h"
+#include "../../../config/definitions.h"
+#include "hardware/timer.h"
 #include "pico/time.h"
-#include "src/definitions.h"
 
 int row_pins[ROW_NUMBER] = {
     PIN_ROW_A,
@@ -51,9 +52,10 @@ inline bool get_kb_state(const RowMask *state, Row row, Col col) {
     return (state[row] >> col) & 1u;
 }
 
-static inline uint32_t ctz_u32(uint32_t x) {
+// count trailing zeros
+static uint ctz(uint x) {
     // x must be non-zero
-    return (uint32_t) __builtin_ctz(x);
+    return (uint) __builtin_ctz(x);
 }
 
 size_t read_pin_state(
@@ -68,7 +70,7 @@ size_t read_pin_state(
         // pull current row low
         gpio_put(row_pins[row], false);
 
-        sleep_us(50);
+        busy_wait_us(10);
 
         for (uint col = 0; col < rowCols[row]; col++) {
             bool is_pressed = !gpio_get(column_pins[col]);
@@ -82,7 +84,7 @@ size_t read_pin_state(
     // generate events
     size_t n = 0;
 
-    for (uint32_t row = 0; row < ROW_NUMBER; ++row) {
+    for (uint row = 0; row < ROW_NUMBER; ++row) {
         RowMask valid = g_row_valid_mask[row];
 
         RowMask prev = prev_kb_state[row] & valid;
@@ -94,14 +96,14 @@ size_t read_pin_state(
 
         // Emit presses
         while (pressed && n < event_buf_len) {
-            uint32_t col = ctz_u32(pressed);
+            uint col = ctz(pressed);
             pressed = pressed & pressed - 1u; // clear lowest set bit
             event_buf[n++] = (keyboard_event){.state = KEY_PRESSED, .key = get_key_id(row, col)};
         }
 
         // Emit releases
         while (released && n < event_buf_len) {
-            uint32_t col = ctz_u32(released);
+            uint col = ctz(released);
             released = released & released - 1u;
             event_buf[n++] = (keyboard_event){.state = KEY_RELEASED, .key = get_key_id(row, col)};
         }
