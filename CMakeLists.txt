@@ -51,6 +51,8 @@ add_executable(midi-controller
         src/kb/event/events.h
         src/kb/event/events.cpp
         src/hooks.cpp
+        config/tusb_config.h
+        src/usb/usb_descriptors.cpp
 )
 
 pico_set_program_name(midi-controller "midi-controller")
@@ -64,6 +66,7 @@ pico_enable_stdio_usb(midi-controller 0)
 target_link_libraries(midi-controller
         pico_stdlib
         FreeRTOS-Kernel-Heap4
+        tinyusb_device
 )
 
 # Add the standard include files to the build

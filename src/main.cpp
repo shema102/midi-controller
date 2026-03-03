@@ -3,12 +3,13 @@
 #include "FreeRTOS.h"
 #include "queue.h"
 #include "task.h"
+#include "tusb.h"
+#include "device/usbd.h"
 
 #include "pico/stdlib.h"
 #include "hardware/gpio.h"
 #include "kb/event/events.h"
 #include "kb/handler/keyboard.h"
-#include "pico/multicore.h"
 
 
 void init_pins() {
@@ -64,11 +65,62 @@ static QueueHandle_t event_queue;
 [[noreturn]] static void process_key_events_task(void *params) {
     (void) params;
 
+    uint octave = 3;
+    uint num_pressed = 0;
+
     keyboard_event ev{};
     for (;;) {
         if (xQueueReceive(event_queue, &ev, pdMS_TO_TICKS(1)) == pdTRUE) {
             log_keyboard_event(&ev, 1);
+
+            if (ev.key == 25 && ev.state == KEY_PRESSED) {
+                continue;
+            }
+            if (ev.key == 25 && ev.state == KEY_RELEASED) {
+                if (octave > 1 && !num_pressed) {
+                    octave--;
+                    printf("Changed octave to %u\r\n", octave);
+                }
+                continue;
+            }
+
+            if (ev.key == 26 && ev.state == KEY_PRESSED) {
+                continue;
+            }
+            if (ev.key == 26 && ev.state == KEY_RELEASED) {
+                if (octave < 6 && !num_pressed) {
+                    octave++;
+                    printf("Changed octave to %u\r\n", octave);
+                }
+                continue;
+            }
+
+            uint8_t msg[3];
+            msg[1] = ev.key + (octave * 12) + 24;
+
+            if (ev.state == KEY_PRESSED) {
+                msg[0] = 0x90; // note on
+                msg[2] = 100;
+
+                num_pressed++;
+            } else {
+                msg[0] = 0x80; // note off
+                msg[2] = 0;
+                num_pressed--;
+            }
+
+            tud_midi_n_stream_write(0, 0, msg, 3);
         }
+    }
+}
+
+[[noreturn]] static void tusb_task(void *params) {
+    (void) params;
+
+    tusb_init();
+
+    for (;;) {
+        tud_task();
     }
 }
 
@@ -80,6 +132,7 @@ static QueueHandle_t event_queue;
 
     TaskHandle_t keyboard_task_handle;
     TaskHandle_t event_task_handle;
+    TaskHandle_t tusb_task_handle;
 
     BaseType_t ok;
 
@@ -87,10 +140,13 @@ static QueueHandle_t event_queue;
     configASSERT(ok == pdPASS);
     ok = xTaskCreate(process_key_events_task, "event_task", 2048, nullptr, 1, &event_task_handle);
     configASSERT(ok == pdPASS);
+    ok = xTaskCreate(tusb_task, "tusb_task", 2048, nullptr, 1, &tusb_task_handle);
+    configASSERT(ok == pdPASS);
+
 
     // affinity mask: run on core 1
     vTaskCoreAffinitySet(keyboard_task_handle, 1 << 0);
-    vTaskCoreAffinitySet(event_task_handle, 1 << 1);
+    vTaskCoreAffinitySet(event_task_handle, 1 << 0);
 
     // reset core 1 to ensure it starts running the scheduler
     // multicore_reset_core1();
