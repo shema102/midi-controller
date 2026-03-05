@@ -1,0 +1,6 @@
+.program midi_tx_inv
+; Outputs 1 bit per loop. Bit time = 8 PIO cycles due to delay [7].
+; Use with autopull=10 bits, shift right (LSB first).
+.wrap_target
+    out pins, 1 [7]
+.wrap

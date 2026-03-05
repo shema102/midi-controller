@@ -52,7 +52,9 @@ add_executable(midi-controller
         src/kb/event/events.cpp
         src/hooks.cpp
         config/tusb_config.h
-        src/usb/usb_descriptors.cpp
+        src/midi/usb/usb_descriptors.cpp
+        src/midi/din/midi_din.cpp
+        src/midi/din/midi_din.h
 )
 
 pico_set_program_name(midi-controller "midi-controller")
@@ -62,11 +64,14 @@ pico_set_program_version(midi-controller "0.1")
 pico_enable_stdio_uart(midi-controller 1)
 pico_enable_stdio_usb(midi-controller 0)
 
+pico_generate_pio_header(midi-controller ${CMAKE_CURRENT_LIST_DIR}/src/midi/din/midi_tx_inv.pio)
+
 # Add the standard library to the build
 target_link_libraries(midi-controller
         pico_stdlib
         FreeRTOS-Kernel-Heap4
         tinyusb_device
+        hardware_pio
 )
 
 # Add the standard include files to the build

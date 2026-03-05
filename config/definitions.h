@@ -41,4 +41,10 @@
 #define PIN_ROW_D     5
 #define PIN_ROW_E     6
 
+// DIN 5 MIDI
+
+#define MIDI_BAUD    31250
+#define MIDI_TX_PIN  16
+#define MIDI_RX_PIN  17
+
 #endif //MIDI_CONTROLLER_DEFINITIONS_H

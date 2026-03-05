@@ -10,6 +10,7 @@
 #include "hardware/gpio.h"
 #include "kb/event/events.h"
 #include "kb/handler/keyboard.h"
+#include "midi/din/midi_din.h"
 
 
 void init_pins() {
@@ -65,6 +66,8 @@ static QueueHandle_t event_queue;
 [[noreturn]] static void process_key_events_task(void *params) {
     (void) params;
 
+    init_din_midi();
+
     uint octave = 3;
     uint num_pressed = 0;
 
@@ -110,6 +113,8 @@ static QueueHandle_t event_queue;
             }
 
             tud_midi_n_stream_write(0, 0, msg, 3);
+
+            write_midi_packet(msg, 3);
         }
     }
 }
@@ -144,12 +149,8 @@ static QueueHandle_t event_queue;
     configASSERT(ok == pdPASS);
 
 
-    // affinity mask: run on core 1
     vTaskCoreAffinitySet(keyboard_task_handle, 1 << 0);
     vTaskCoreAffinitySet(event_task_handle, 1 << 0);
-
-    // reset core 1 to ensure it starts running the scheduler
-    // multicore_reset_core1();
 
     vTaskStartScheduler();
 
