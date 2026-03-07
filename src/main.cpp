@@ -4,53 +4,48 @@
 #include "queue.h"
 #include "task.h"
 #include "tusb.h"
+#include "debug/debug.h"
 #include "device/usbd.h"
 
 #include "pico/stdlib.h"
-#include "hardware/gpio.h"
 #include "kb/event/events.h"
 #include "kb/handler/keyboard.h"
 #include "midi/din/midi_din.h"
 
-
-void init_pins() {
-    gpio_init(PICO_DEFAULT_LED_PIN);
-    gpio_set_dir(PICO_DEFAULT_LED_PIN, GPIO_OUT);
-}
-
-inline void set_led(bool val) {
-    gpio_put(PICO_DEFAULT_LED_PIN, val);
-}
 
 static QueueHandle_t event_queue;
 
 [[noreturn]] static void keyboard_poll_task(void *params) {
     (void) params;
 
-    init_pins();
+    init_debug();
     init_keyboard_pins();
 
-    keyboard_event event_buf[27];
+    keyboard_event event_buf[BUTTON_COUNT];
 
     uint tick_count = 0;
     bool led_state = false;
 
-    const TickType_t loop_period = pdMS_TO_TICKS(10);
-    const TickType_t blink_period = pdMS_TO_TICKS(1000);
+    constexpr TickType_t loop_period = pdMS_TO_TICKS(1);
+    constexpr TickType_t blink_period = pdMS_TO_TICKS(1000);
     TickType_t last_wake = xTaskGetTickCount();
     TickType_t last_blink = last_wake;
 
     for (;;) {
-        size_t count = read_pin_state(event_buf, 27);
+        const size_t count = read_pin_state(event_buf, BUTTON_COUNT);
 
         // Send events to the queue and clear the buffer
         for (size_t i = 0; i < count; ++i) {
-            xQueueSend(event_queue, &event_buf[i], 0);
-
-            event_buf[i] = {};
+            BaseType_t ok = xQueueSend(event_queue, &event_buf[i], 0);
+            if (ok != pdPASS) {
+                printf("Event queue full, dropping event: key=%u state=%s\r\n",
+                       event_buf[i].key,
+                       event_buf[i].state == KEY_PRESSED ? "PRESSED" : "RELEASED");
+            }
         }
 
         TickType_t now = xTaskGetTickCount();
+
         if ((now - last_blink) >= blink_period) {
             last_blink += blink_period;
             led_state = !led_state;
@@ -76,10 +71,10 @@ static QueueHandle_t event_queue;
         if (xQueueReceive(event_queue, &ev, pdMS_TO_TICKS(1)) == pdTRUE) {
             log_keyboard_event(&ev, 1);
 
-            if (ev.key == 25 && ev.state == KEY_PRESSED) {
+            if (ev.key == OCTAVE_DOWN_KEY && ev.state == KEY_PRESSED) {
                 continue;
             }
-            if (ev.key == 25 && ev.state == KEY_RELEASED) {
+            if (ev.key == OCTAVE_DOWN_KEY && ev.state == KEY_RELEASED) {
                 if (octave > 1 && !num_pressed) {
                     octave--;
                     printf("Changed octave to %u\r\n", octave);
@@ -87,10 +82,10 @@ static QueueHandle_t event_queue;
                 continue;
             }
 
-            if (ev.key == 26 && ev.state == KEY_PRESSED) {
+            if (ev.key == OCTAVE_UP_KEY && ev.state == KEY_PRESSED) {
                 continue;
             }
-            if (ev.key == 26 && ev.state == KEY_RELEASED) {
+            if (ev.key == OCTAVE_UP_KEY && ev.state == KEY_RELEASED) {
                 if (octave < 6 && !num_pressed) {
                     octave++;
                     printf("Changed octave to %u\r\n", octave);
@@ -105,11 +100,16 @@ static QueueHandle_t event_queue;
                 msg[0] = 0x90; // note on
                 msg[2] = 100;
 
-                num_pressed++;
+                if (num_pressed < 255) { // prevent overflow
+                    ++num_pressed;
+                }
             } else {
                 msg[0] = 0x80; // note off
                 msg[2] = 0;
-                num_pressed--;
+
+                if (num_pressed > 0) {
+                    --num_pressed;
+                }
             }
 
             tud_midi_n_stream_write(0, 0, msg, 3);
@@ -149,8 +149,8 @@ static QueueHandle_t event_queue;
     configASSERT(ok == pdPASS);
 
 
-    vTaskCoreAffinitySet(keyboard_task_handle, 1 << 0);
-    vTaskCoreAffinitySet(event_task_handle, 1 << 0);
+    vTaskCoreAffinitySet(keyboard_task_handle, 2);
+    vTaskCoreAffinitySet(event_task_handle,  2);
 
     vTaskStartScheduler();
 

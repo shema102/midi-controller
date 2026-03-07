@@ -4,7 +4,7 @@
 #include "hardware/gpio.h"
 #include "../../../config/definitions.h"
 #include "hardware/timer.h"
-#include "pico/time.h"
+#include "src/debug/debug.h"
 
 int row_pins[ROW_NUMBER] = {
     PIN_ROW_A,
@@ -62,6 +62,7 @@ size_t read_pin_state(
     keyboard_event *event_buf,
     size_t event_buf_len
 ) {
+    set_debug_pin(true);
     for (uint i = 0; i < ROW_NUMBER; i++) {
         prev_kb_state[i] = current_kb_state[i];
     }
@@ -70,7 +71,7 @@ size_t read_pin_state(
         // pull current row low
         gpio_put(row_pins[row], false);
 
-        busy_wait_us(10);
+        busy_wait_us(ROW_SETTLE_US);
 
         for (uint col = 0; col < rowCols[row]; col++) {
             bool is_pressed = !gpio_get(column_pins[col]);
@@ -96,20 +97,23 @@ size_t read_pin_state(
 
         // Emit presses
         while (pressed && n < event_buf_len) {
-            uint col = ctz(pressed);
-            pressed = pressed & pressed - 1u; // clear lowest set bit
+            uint col = ctz(pressed); // find the lowest set bit
             event_buf[n++] = (keyboard_event){.state = KEY_PRESSED, .key = get_key_id(row, col)};
+
+            pressed &= (pressed - 1u); // clear lowest set bit
         }
 
         // Emit releases
         while (released && n < event_buf_len) {
             uint col = ctz(released);
-            released = released & released - 1u;
             event_buf[n++] = (keyboard_event){.state = KEY_RELEASED, .key = get_key_id(row, col)};
+
+            released &= (released - 1u);
         }
 
         if (n == event_buf_len) break; // buffer full
     }
+    set_debug_pin(false);
 
     return n;
 }

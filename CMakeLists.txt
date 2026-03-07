@@ -55,6 +55,8 @@ add_executable(midi-controller
         src/midi/usb/usb_descriptors.cpp
         src/midi/din/midi_din.cpp
         src/midi/din/midi_din.h
+        src/debug/debug.cpp
+        src/debug/debug.h
 )
 
 pico_set_program_name(midi-controller "midi-controller")

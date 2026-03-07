@@ -3,6 +3,8 @@
 
 // ===================== BUTTONS ======================
 
+#define BUTTON_COUNT     27
+
 #define COLUMN_NUMBER   6
 #define ROW_NUMBER      5
 
@@ -26,6 +28,11 @@
 //             1    3         6     8    10         13    15         18     20     22
 //25  26    0    2    4    5    7    9     11   12     14    16   17     19    21     23   24
 
+#define OCTAVE_UP_KEY 26
+#define OCTAVE_DOWN_KEY 25
+
+#define NUM_NOTE_KEYS 25
+
 // GPIOs
 
 #define PIN_COLUMN_A 10
@@ -46,5 +53,9 @@
 #define MIDI_BAUD    31250
 #define MIDI_TX_PIN  16
 #define MIDI_RX_PIN  17
+
+// DEBUG
+
+#define DEBUG_PIN 22
 
 #endif //MIDI_CONTROLLER_DEFINITIONS_H

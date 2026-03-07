@@ -4,6 +4,8 @@
 #include "pico/types.h"
 #include "../../../config/definitions.h"
 
+constexpr uint ROW_SETTLE_US = 10;
+
 enum Col {
     CA,
     CB,
