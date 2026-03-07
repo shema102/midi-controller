@@ -11,6 +11,7 @@
 #include "kb/event/events.h"
 #include "kb/handler/keyboard.h"
 #include "midi/din/midi_din.h"
+#include "midi/message/message.h"
 
 
 static QueueHandle_t event_queue;
@@ -68,7 +69,7 @@ static QueueHandle_t event_queue;
 
     keyboard_event ev{};
     for (;;) {
-        if (xQueueReceive(event_queue, &ev, pdMS_TO_TICKS(1)) == pdTRUE) {
+        if (xQueueReceive(event_queue, &ev, portMAX_DELAY) == pdTRUE) {
             log_keyboard_event(&ev, 1);
 
             if (ev.key == OCTAVE_DOWN_KEY && ev.state == KEY_PRESSED) {
@@ -93,28 +94,30 @@ static QueueHandle_t event_queue;
                 continue;
             }
 
-            uint8_t msg[3];
-            msg[1] = ev.key + (octave * 12) + 24;
+            midi_message msg;
 
             if (ev.state == KEY_PRESSED) {
-                msg[0] = 0x90; // note on
-                msg[2] = 100;
+                msg = get_note_on_message(0, note_for_key(ev.key, octave), 127);
 
-                if (num_pressed < 255) { // prevent overflow
+                if (num_pressed < 255) {
+                    // prevent overflow
                     ++num_pressed;
                 }
             } else {
-                msg[0] = 0x80; // note off
-                msg[2] = 0;
+                msg = get_note_off_message(0, note_for_key(ev.key, octave));
 
                 if (num_pressed > 0) {
                     --num_pressed;
                 }
             }
 
-            tud_midi_n_stream_write(0, 0, msg, 3);
+            uint32_t res = tud_midi_n_stream_write(0, 0, msg.data, 3);
 
-            write_midi_packet(msg, 3);
+            if (res != 3) {
+                printf("Failed to send MIDI message over USB, res=%u\r\n", res);
+            }
+
+            write_midi_packet(msg.data, 3);
         }
     }
 }
@@ -126,6 +129,7 @@ static QueueHandle_t event_queue;
 
     for (;;) {
         tud_task();
+        taskYIELD();
     }
 }
 
@@ -141,16 +145,17 @@ static QueueHandle_t event_queue;
 
     BaseType_t ok;
 
-    ok = xTaskCreate(keyboard_poll_task, "main_task", 2048, nullptr, 1, &keyboard_task_handle);
+    ok = xTaskCreate(keyboard_poll_task, "kbd_pol", 2048, nullptr, 1, &keyboard_task_handle);
     configASSERT(ok == pdPASS);
-    ok = xTaskCreate(process_key_events_task, "event_task", 2048, nullptr, 1, &event_task_handle);
+    ok = xTaskCreate(process_key_events_task, "kbd_evt", 2048, nullptr, 1, &event_task_handle);
     configASSERT(ok == pdPASS);
-    ok = xTaskCreate(tusb_task, "tusb_task", 2048, nullptr, 1, &tusb_task_handle);
+    ok = xTaskCreate(tusb_task, "usb_midi", 2048, nullptr, 1, &tusb_task_handle);
     configASSERT(ok == pdPASS);
 
-
-    vTaskCoreAffinitySet(keyboard_task_handle, 2);
-    vTaskCoreAffinitySet(event_task_handle,  2);
+    // run everything on core 0 for now.
+    vTaskCoreAffinitySet(keyboard_task_handle, 1 << 0);
+    vTaskCoreAffinitySet(event_task_handle, 1 << 0);
+    vTaskCoreAffinitySet(tusb_task_handle, 1 << 0);
 
     vTaskStartScheduler();
 

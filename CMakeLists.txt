@@ -40,8 +40,6 @@ set(FREERTOS_KERNEL_PATH ${CMAKE_CURRENT_LIST_DIR}/lib/FreeRTOS-Kernel)
 
 include(${CMAKE_CURRENT_LIST_DIR}/FreeRTOS_Kernel_import.cmake)
 
-# Add executable. Default name is the project name, version 0.1
-
 add_executable(midi-controller
         src/main.cpp
         config/definitions.h
@@ -57,6 +55,8 @@ add_executable(midi-controller
         src/midi/din/midi_din.h
         src/debug/debug.cpp
         src/debug/debug.h
+        src/midi/message/message.cpp
+        src/midi/message/message.h
 )
 
 pico_set_program_name(midi-controller "midi-controller")
